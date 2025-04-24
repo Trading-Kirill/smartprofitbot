@@ -24,16 +24,16 @@ load_dotenv()
 api_id = os.getenv("API_ID")
 api_hash = os.getenv("API_HASH")
 openai_api_key = os.getenv("OPENAI_API_KEY")
+bot_token = os.getenv("BOT_TOKEN")
 
 # Проверка наличия переменных окружения
-if not api_id or not api_hash or not openai_api_key:
-    raise EnvironmentError("Отсутствуют переменные окружения: API_ID, API_HASH или OPENAI_API_KEY")
+if not api_id or not api_hash or not openai_api_key or not bot_token:
+    raise EnvironmentError("Отсутствуют переменные окружения: API_ID, API_HASH, OPENAI_API_KEY или BOT_TOKEN")
 
 # Устанавливаем ключ для OpenAI
 openai.api_key = openai_api_key
 
 # Создаем клиента Telegram
-bot_token = os.getenv("BOT_TOKEN")
 client = TelegramClient('smartprofit_bot', api_id, api_hash).start(bot_token=bot_token)
 channel_username = 'smartprofittrading'
 
@@ -48,6 +48,7 @@ TICKER_REGEX = r"[A-Z]{2,5}(USDT|USD|EUR|BTC)?"
 
 @client.on(events.NewMessage(chats=channel_username))
 async def handle_new_post(event):
+    print(f"Новое сообщение: {event.message.message}")  # Логирование сообщения
     post = event.message.message
     if not post:
         return
