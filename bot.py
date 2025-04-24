@@ -33,7 +33,8 @@ if not api_id or not api_hash or not openai_api_key:
 openai.api_key = openai_api_key
 
 # Создаем клиента Telegram
-client = TelegramClient('smartprofit_bot', api_id, api_hash)
+bot_token = os.getenv("BOT_TOKEN")
+client = TelegramClient('smartprofit_bot', api_id, api_hash).start(bot_token=bot_token)
 channel_username = 'smartprofittrading'
 
 # Создаем базу данных TinyDB
