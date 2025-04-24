@@ -2,17 +2,19 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
+import openai as openai_module
 from tinydb import TinyDB, Query
 
-# Явно указываем путь к .env рядом с этим файлом
+# Явно загружаем .env из папки с этим файлом
 env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-# Инициализация клиента OpenAI с ключом из переменных окружения
+# Проверяем, что ключ задан
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
     raise EnvironmentError("OPENAI_API_KEY не задана в .env")
 
+# Инициализация клиента OpenAI
 client = OpenAI(api_key=api_key)
 
 def generate_ai_comment(post_text: str, ticker_info: str, style: str) -> str:
@@ -22,15 +24,20 @@ def generate_ai_comment(post_text: str, ticker_info: str, style: str) -> str:
         f"Стиль: {style}\n\n"
         "Сгенерируй краткий профессиональный комментарий для трейдеров."
     )
-    resp = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "You are a helpful financial trading assistant."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=150
-    )
-    return resp.choices[0].message.content.strip()
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful financial trading assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=150
+        )
+        return resp.choices[0].message.content.strip()
+    except openai_module.error.RateLimitError:
+        return "⚠️ Извините, временно превышен лимит запросов. Попробуйте позже."
+    except openai_module.error.OpenAIError as e:
+        return f"⚠️ Ошибка OpenAI API: {e}"
 
 def analyze_ticker(ticker: str) -> str:
     return f"Анализ тикера {ticker}: объёмы растут, возможен разворот."
@@ -50,39 +57,59 @@ def update_feedback(db: TinyDB, comment: str, reaction: int = None) -> None:
 
 def summarize_post(post_text: str) -> str:
     prompt = f"Сформулируй краткое резюме в 1–2 предложениях для текста:\n{post_text}"
-    resp = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=60
-    )
-    return resp.choices[0].message.content.strip()
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=60
+        )
+        return resp.choices[0].message.content.strip()
+    except openai_module.error.RateLimitError:
+        return "⚠️ Нельзя сейчас сделать резюме — квота исчерпана."
+    except openai_module.error.OpenAIError as e:
+        return f"⚠️ Ошибка при резюме: {e}"
 
 def translate_post(post_text: str, target_lang: str = "en") -> str:
     prompt = f"Переведи следующий текст на {target_lang}:\n{post_text}"
-    resp = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=100
-    )
-    return resp.choices[0].message.content.strip()
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=100
+        )
+        return resp.choices[0].message.content.strip()
+    except openai_module.error.RateLimitError:
+        return "⚠️ Нельзя сейчас перевести — квота исчерпана."
+    except openai_module.error.OpenAIError as e:
+        return f"⚠️ Ошибка при переводе: {e}"
 
 def predict_market_sentiment(post_text: str) -> str:
     prompt = (
         "Проанализируй торговый пост и дай прогноз движения рынка "
         "(рост, падение или нейтрально) с кратким объяснением:\n" + post_text
     )
-    resp = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=80
-    )
-    return resp.choices[0].message.content.strip()
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=80
+        )
+        return resp.choices[0].message.content.strip()
+    except openai_module.error.RateLimitError:
+        return "⚠️ Нельзя сейчас дать прогноз — квота исчерпана."
+    except openai_module.error.OpenAIError as e:
+        return f"⚠️ Ошибка при прогнозе: {e}"
 
 def generate_catchy_title(post_text: str) -> str:
     prompt = f"Придумай короткий, броский заголовок для поста трейдера:\n{post_text}"
-    resp = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=15
-    )
-    return resp.choices[0].message.content.strip()
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=15
+        )
+        return resp.choices[0].message.content.strip()
+    except openai_module.error.RateLimitError:
+        return "⚠️ Нельзя сейчас создать заголовок — квота исчерпана."
+    except openai_module.error.OpenAIError as e:
+        return f"⚠️ Ошибка при заголовке: {e}"
