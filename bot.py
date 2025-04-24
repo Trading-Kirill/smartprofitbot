@@ -4,8 +4,16 @@ import openai
 import asyncio
 from telethon import TelegramClient, events, functions, types
 from textblob import TextBlob
-from utils import analyze_ticker, generate_ai_comment, update_feedback
-from tinydb import TinyDB, Query
+from utils import (
+    analyze_ticker,
+    generate_ai_comment,
+    update_feedback,
+    summarize_post,
+    translate_post,
+    predict_market_sentiment,
+    generate_catchy_title
+)
+from tinydb import TinyDB
 import os
 from dotenv import load_dotenv
 
@@ -57,16 +65,34 @@ async def handle_new_post(event):
     # Случайная задержка перед ответом
     await asyncio.sleep(random.randint(30, 90))
 
-    # Генерация комментария
+    # Получаем стиль из базы
     style = db.table('styles').get(doc_id=1) or {"mode": "default"}
+
+    # Генерация AI-комментария
     comment = generate_ai_comment(post, ticker_info, style.get("mode", "default"))
 
+    # Дополнительные AI-функции
+    summary = summarize_post(post)
+    translation = translate_post(post, "en")
+    prediction = predict_market_sentiment(post)
+    catchy_title = generate_catchy_title(post)
+
+    # Полный AI-ответ
+    full_comment = f"""💡 *AI-резюме*: {summary}
+🌐 *Перевод*: {translation}
+📊 *Прогноз*: {prediction}
+🧠 *Заголовок*: {catchy_title}
+
+✍️ *Комментарий бота*: {comment}
+"""
+
     try:
-        # Отправка сгенерированного комментария
+        # Отправка сгенерированного сообщения
         await client.send_message(
-            entity=event.message.to_id,
-            message=comment,
-            reply_to=event.message.id
+            entity=event.chat_id,
+            message=full_comment,
+            reply_to=event.message.id,
+            parse_mode="markdown"
         )
     except Exception as e:
         print(f"Ошибка при отправке сообщения: {e}")
@@ -75,17 +101,17 @@ async def handle_new_post(event):
     if random.random() < 0.5:
         try:
             await client(functions.messages.SendReactionRequest(
-                peer=event.message.to_id,
+                peer=event.chat_id,
                 msg_id=event.message.id,
                 reaction=[types.ReactionEmoji(emoticon=random.choice(reaction_emojis))]
             ))
         except Exception as e:
             print(f"Ошибка при отправке реакции: {e}")
 
-    # Обновление обратной связи в базе данных
+    # Обновление обратной связи
     update_feedback(db, comment)
 
-# Запуск бота
+# Запуск клиента
 with client:
     print("SmartProfitBot запущен...")
     client.run_until_disconnected()
