@@ -35,7 +35,11 @@ openai.api_key = openai_api_key
 
 # Создаем клиента Telegram
 client = TelegramClient('smartprofit_bot', api_id, api_hash).start(bot_token=bot_token)
-channel_username = 'smartprofittrading'
+channel_username = os.getenv("CHANNEL_USERNAME").lstrip("@")
+
+@client.on(events.NewMessage(pattern='/start'))
+async def start_handler(event):
+    await event.respond("Бот работает! Готов к анализу графиков.")
 
 # Создаем базу данных TinyDB
 db = TinyDB('storage.json')
@@ -112,6 +116,8 @@ async def handle_new_post(event):
 
     # Обновление обратной связи
     update_feedback(db, comment)
+
+print(f"Получено сообщение: {event.message.message}")
 
 # Запуск клиента
 with client:
