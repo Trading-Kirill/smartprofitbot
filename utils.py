@@ -5,13 +5,13 @@ def generate_ai_comment(post_text, ticker_info, style):
     prompt = f"Post: {post_text}"
 Ticker: {ticker_info}
 Style: {style}
-Generate a comment:"
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
-        max_tokens=150
-    )
-    return response.choices[0].text.strip()
+prompt = "Generate a comment:"
+response = openai.Completion.create(
+    engine="text-davinci-003",
+    prompt=prompt,
+    max_tokens=150
+)
+return response.choices[0].text.strip()
 
 # Анализ тикера (заглушка)
 def analyze_ticker(ticker):
