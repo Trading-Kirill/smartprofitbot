@@ -1,25 +1,22 @@
 import openai
 from tinydb import TinyDB, Query
 
-# Генерация комментариев с помощью OpenAI
+# Генерация комментариев с помощью OpenAI ChatCompletion
 def generate_ai_comment(post_text, ticker_info, style):
-    prompt = f"""
-    Пост: {post_text}
-    Данные по тикеру: {ticker_info}
-    Стиль: {style}
-
-    Сгенерируй содержательный комментарий от имени трейдера:
-    """
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
+    prompt = f"Post: {post_text}\nTicker: {ticker_info}\nStyle: {style}\nGenerate a concise trading comment."
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a helpful financial trading assistant."},
+            {"role": "user",   "content": prompt}
+        ],
         max_tokens=150
     )
-    return response.choices[0].text.strip()
+    return response.choices[0].message.content.strip()
 
 # Анализ тикера (заглушка)
 def analyze_ticker(ticker):
-    return f"Анализ тикера {ticker}: объёмы растут, возможен пробой уровня сопротивления."
+    return f"Info about {ticker}"
 
 # Обновление данных о реакции
 def update_feedback(db, comment, reaction=None):
@@ -27,7 +24,6 @@ def update_feedback(db, comment, reaction=None):
     reactions_table = db.table('reactions')
 
     reaction_entry = reactions_table.get(Query().comment == comment)
-
     if reaction_entry:
         reactions_table.update({"count": reaction_entry["count"] + 1}, Query().comment == comment)
     else:
@@ -35,61 +31,48 @@ def update_feedback(db, comment, reaction=None):
 
     all_reactions = reactions_table.all()
     avg_reaction = sum(r["count"] for r in all_reactions) / len(all_reactions) if all_reactions else 0
-
     new_mode = "analytical" if avg_reaction > 5 else "motivational"
     styles_table.upsert({"mode": new_mode}, Query().doc_id == 1)
 
 # Суммаризация поста
 def summarize_post(post_text):
-    prompt = f"""
-    Текст: {post_text}
-
-    Сформулируй краткое резюме в одном-двух предложениях:
-    """
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
+    prompt = f"Сформулируй краткое резюме в 1-2 предложениях для текста:\n{post_text}"
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
         max_tokens=60
     )
-    return response.choices[0].text.strip()
+    return response.choices[0].message.content.strip()
 
 # Перевод на английский
 def translate_post(post_text, target_lang="en"):
-    prompt = f"""
-    Переведи следующий текст на английский:
-    {post_text}
-    """
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
+    prompt = f"Переведи следующий текст на {target_lang}:\n{post_text}"
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
         max_tokens=100
     )
-    return response.choices[0].text.strip()
+    return response.choices[0].message.content.strip()
 
 # Прогноз движения рынка по тексту поста
 def predict_market_sentiment(post_text):
-    prompt = f"""
-    Проанализируй следующий пост и сделай краткий прогноз движения рынка:
-    {post_text}
-
-    Ответь: рост, падение или нейтрально, и поясни почему.
-    """
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
+    prompt = (
+        f"Проанализируй пост торговой тематики и дай прогноз движения рынка "
+        f"(рост, падение или нейтрально) с кратким объяснением:\n{post_text}"
+    )
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
         max_tokens=80
     )
-    return response.choices[0].text.strip()
+    return response.choices[0].message.content.strip()
 
 # Генерация привлекательного заголовка
 def generate_catchy_title(post_text):
-    prompt = f"""
-    Придумай краткий, броский заголовок к следующему посту трейдера:
-    {post_text}
-    """
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
+    prompt = f"Придумай короткий и цепляющий заголовок для поста трейдера:\n{post_text}"
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
         max_tokens=15
     )
-    return response.choices[0].text.strip()
+    return response.choices[0].message.content.strip()
