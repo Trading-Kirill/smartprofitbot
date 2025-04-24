@@ -2,7 +2,7 @@ import openai
 
 # Генерация комментариев с помощью OpenAI
 def generate_ai_comment(post_text, ticker_info, style):
-    prompt = f"Post: {post_text}
+    prompt = f"Post: {post_text}"
 Ticker: {ticker_info}
 Style: {style}
 Generate a comment:"
