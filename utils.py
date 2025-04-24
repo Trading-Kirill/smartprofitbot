@@ -1,78 +1,87 @@
-import openai
+import os
+from openai import OpenAI
 from tinydb import TinyDB, Query
 
-# Генерация комментариев с помощью OpenAI ChatCompletion
-def generate_ai_comment(post_text, ticker_info, style):
-    prompt = f"Post: {post_text}\nTicker: {ticker_info}\nStyle: {style}\nGenerate a concise trading comment."
-    response = openai.ChatCompletion.create(
+# Инициализация клиента OpenAI с ключом из переменных окружения
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Генерация основного комментария через chat completions
+def generate_ai_comment(post_text: str, ticker_info: str, style: str) -> str:
+    prompt = (
+        f"Пост: {post_text}\n"
+        f"Данные по тикеру: {ticker_info}\n"
+        f"Стиль: {style}\n\n"
+        "Сгенерируй краткий профессиональный комментарий для трейдеров."
+    )
+    resp = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": "You are a helpful financial trading assistant."},
-            {"role": "user",   "content": prompt}
+            {"role": "user", "content": prompt}
         ],
         max_tokens=150
     )
-    return response.choices[0].message.content.strip()
+    return resp.choices[0].message.content.strip()
 
-# Анализ тикера (заглушка)
-def analyze_ticker(ticker):
-    return f"Info about {ticker}"
+# Простая заглушка для анализа тикера
+def analyze_ticker(ticker: str) -> str:
+    return f"Анализ тикера {ticker}: объёмы растут, возможен разворот."
 
-# Обновление данных о реакции
-def update_feedback(db, comment, reaction=None):
-    styles_table = db.table('styles')
-    reactions_table = db.table('reactions')
+# Обновление обратной связи в базе TinyDB
+def update_feedback(db: TinyDB, comment: str, reaction: int = None) -> None:
+    styles_table = db.table("styles")
+    reactions_table = db.table("reactions")
 
-    reaction_entry = reactions_table.get(Query().comment == comment)
-    if reaction_entry:
-        reactions_table.update({"count": reaction_entry["count"] + 1}, Query().comment == comment)
+    entry = reactions_table.get(Query().comment == comment)
+    if entry:
+        reactions_table.update({"count": entry["count"] + 1}, Query().comment == comment)
     else:
         reactions_table.insert({"comment": comment, "count": 1})
 
-    all_reactions = reactions_table.all()
-    avg_reaction = sum(r["count"] for r in all_reactions) / len(all_reactions) if all_reactions else 0
-    new_mode = "analytical" if avg_reaction > 5 else "motivational"
+    all_reacts = reactions_table.all()
+    avg = sum(r["count"] for r in all_reacts) / len(all_reacts) if all_reacts else 0
+    new_mode = "analytical" if avg > 5 else "motivational"
     styles_table.upsert({"mode": new_mode}, Query().doc_id == 1)
 
-# Суммаризация поста
-def summarize_post(post_text):
-    prompt = f"Сформулируй краткое резюме в 1-2 предложениях для текста:\n{post_text}"
-    response = openai.ChatCompletion.create(
+# Краткое резюме поста
+def summarize_post(post_text: str) -> str:
+    prompt = f"Сформулируй краткое резюме в 1–2 предложениях для текста:\n{post_text}"
+    resp = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=60
     )
-    return response.choices[0].message.content.strip()
+    return resp.choices[0].message.content.strip()
 
-# Перевод на английский
-def translate_post(post_text, target_lang="en"):
+# Перевод поста на целевой язык (по умолчанию – английский)
+def translate_post(post_text: str, target_lang: str = "en") -> str:
     prompt = f"Переведи следующий текст на {target_lang}:\n{post_text}"
-    response = openai.ChatCompletion.create(
+    resp = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=100
     )
-    return response.choices[0].message.content.strip()
+    return resp.choices[0].message.content.strip()
 
-# Прогноз движения рынка по тексту поста
-def predict_market_sentiment(post_text):
+# Прогноз движения рынка по тексту
+def predict_market_sentiment(post_text: str) -> str:
     prompt = (
-        f"Проанализируй пост торговой тематики и дай прогноз движения рынка "
-        f"(рост, падение или нейтрально) с кратким объяснением:\n{post_text}"
+        "Проанализируй торговый пост и дай прогноз движения рынка "
+        "(рост, падение или нейтрально) с кратким объяснением:\n" + post_text
     )
-    response = openai.ChatCompletion.create(
+    resp = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=80
     )
-    return response.choices[0].message.content.strip()
+    return resp.choices[0].message.content.strip()
 
-# Генерация привлекательного заголовка
-def generate_catchy_title(post_text):
-    prompt = f"Придумай короткий и цепляющий заголовок для поста трейдера:\n{post_text}"
-    response = openai.ChatCompletion.create(
+# Генерация цепляющего заголовка
+def generate_catchy_title(post_text: str) -> str:
+    prompt = f"Придумай короткий, броский заголовок для поста трейдера:\n{post_text}"
+    resp = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=15
     )
-    return response.choices[0].message.content.strip()
+    return resp.choices[0].message.content.strip()
