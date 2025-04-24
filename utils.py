@@ -1,11 +1,14 @@
 import os
+from dotenv import load_dotenv
 from openai import OpenAI
 from tinydb import TinyDB, Query
+
+# Загружаем .env для того, чтобы os.getenv("OPENAI_API_KEY") уже видел ключ
+load_dotenv()
 
 # Инициализация клиента OpenAI с ключом из переменных окружения
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Генерация основного комментария через chat completions
 def generate_ai_comment(post_text: str, ticker_info: str, style: str) -> str:
     prompt = (
         f"Пост: {post_text}\n"
@@ -23,27 +26,22 @@ def generate_ai_comment(post_text: str, ticker_info: str, style: str) -> str:
     )
     return resp.choices[0].message.content.strip()
 
-# Простая заглушка для анализа тикера
 def analyze_ticker(ticker: str) -> str:
     return f"Анализ тикера {ticker}: объёмы растут, возможен разворот."
 
-# Обновление обратной связи в базе TinyDB
 def update_feedback(db: TinyDB, comment: str, reaction: int = None) -> None:
     styles_table = db.table("styles")
     reactions_table = db.table("reactions")
-
     entry = reactions_table.get(Query().comment == comment)
     if entry:
         reactions_table.update({"count": entry["count"] + 1}, Query().comment == comment)
     else:
         reactions_table.insert({"comment": comment, "count": 1})
-
     all_reacts = reactions_table.all()
     avg = sum(r["count"] for r in all_reacts) / len(all_reacts) if all_reacts else 0
     new_mode = "analytical" if avg > 5 else "motivational"
     styles_table.upsert({"mode": new_mode}, Query().doc_id == 1)
 
-# Краткое резюме поста
 def summarize_post(post_text: str) -> str:
     prompt = f"Сформулируй краткое резюме в 1–2 предложениях для текста:\n{post_text}"
     resp = client.chat.completions.create(
@@ -53,7 +51,6 @@ def summarize_post(post_text: str) -> str:
     )
     return resp.choices[0].message.content.strip()
 
-# Перевод поста на целевой язык (по умолчанию – английский)
 def translate_post(post_text: str, target_lang: str = "en") -> str:
     prompt = f"Переведи следующий текст на {target_lang}:\n{post_text}"
     resp = client.chat.completions.create(
@@ -63,7 +60,6 @@ def translate_post(post_text: str, target_lang: str = "en") -> str:
     )
     return resp.choices[0].message.content.strip()
 
-# Прогноз движения рынка по тексту
 def predict_market_sentiment(post_text: str) -> str:
     prompt = (
         "Проанализируй торговый пост и дай прогноз движения рынка "
@@ -76,7 +72,6 @@ def predict_market_sentiment(post_text: str) -> str:
     )
     return resp.choices[0].message.content.strip()
 
-# Генерация цепляющего заголовка
 def generate_catchy_title(post_text: str) -> str:
     prompt = f"Придумай короткий, броский заголовок для поста трейдера:\n{post_text}"
     resp = client.chat.completions.create(
