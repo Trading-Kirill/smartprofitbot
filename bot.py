@@ -20,90 +20,84 @@ from dotenv import load_dotenv
 # Загружаем переменные окружения
 load_dotenv()
 
-# Получаем переменные окружения
 api_id = os.getenv("API_ID")
 api_hash = os.getenv("API_HASH")
 openai_api_key = os.getenv("OPENAI_API_KEY")
 bot_token = os.getenv("BOT_TOKEN")
+channel_username = os.getenv("CHANNEL_USERNAME", "smartprofittrading").lstrip("@")
 
-# Проверка наличия переменных окружения
-if not api_id or not api_hash or not openai_api_key or not bot_token:
-    raise EnvironmentError("Отсутствуют переменные окружения: API_ID, API_HASH, OPENAI_API_KEY или BOT_TOKEN")
+if not all([api_id, api_hash, openai_api_key, bot_token]):
+    raise EnvironmentError("Не заданы переменные окружения: API_ID, API_HASH, OPENAI_API_KEY или BOT_TOKEN")
 
-# Устанавливаем ключ для OpenAI
 openai.api_key = openai_api_key
 
-# Создаем клиента Telegram
-client = TelegramClient('smartprofit_bot', api_id, api_hash).start(bot_token=bot_token)
-channel_username = os.getenv("CHANNEL_USERNAME").lstrip("@")
+# Инициализируем клиента бота
+client = TelegramClient('smartprofit_bot', int(api_id), api_hash).start(bot_token=bot_token)
 
-@client.on(events.NewMessage(pattern='/start'))
-async def start_handler(event):
-    await event.respond("Бот работает! Готов к анализу графиков.")
-
-# Создаем базу данных TinyDB
 db = TinyDB('storage.json')
-
-# Эмодзи для реакции
 reaction_emojis = ['👍', '🔥', '❤️', '👏']
-
-# Регулярное выражение для поиска тикеров
 TICKER_REGEX = r"[A-Z]{2,5}(USDT|USD|EUR|BTC)?"
 
+# Обработчик личных сообщений
+@client.on(events.NewMessage(pattern='/start'))
+async def start_handler(event):
+    print(f"Start from {event.sender_id}")
+    await event.respond("👋 Привет! Я SmartProfitBot. Отправь пост в канал или спроси меня здесь.")
+
+# Обработчик новых сообщений в канале
 @client.on(events.NewMessage(chats=channel_username))
 async def handle_new_post(event):
-    print(f"Новое сообщение: {event.message.message}")  # Логирование сообщения
     post = event.message.message
-    if not post:
-        return
+    print(f"Получено сообщение в канале: {post}")
 
-    # Оценка тональности сообщения
-    if TextBlob(post).sentiment.polarity < 0.1:
+    # Рассчитываем тональность
+    polarity = TextBlob(post).sentiment.polarity
+    print(f"Полярность: {polarity}")
+
+    # Порог тональности — сейчас 0.0, чтобы бот отвечал на любые сообщения
+    if polarity < 0.0:
+        print("Сообщение проигнорировано из-за тональности")
         return
 
     # Поиск тикера
     ticker_match = re.search(TICKER_REGEX, post)
-    ticker_info = ""
-    if ticker_match:
-        ticker = ticker_match.group(0)
-        ticker_info = analyze_ticker(ticker)
+    ticker_info = analyze_ticker(ticker_match.group(0)) if ticker_match else ""
 
-    # Случайная задержка перед ответом
-    await asyncio.sleep(random.randint(30, 90))
+    # Задержка для имитации человека
+    delay = random.randint(30, 90)
+    print(f"Ждём {delay} сек...")
+    await asyncio.sleep(delay)
 
-    # Получаем стиль из базы
+    # Генерация основного комментария
     style = db.table('styles').get(doc_id=1) or {"mode": "default"}
+    comment = generate_ai_comment(post, ticker_info, style.get("mode"))
 
-    # Генерация AI-комментария
-    comment = generate_ai_comment(post, ticker_info, style.get("mode", "default"))
-
-    # Дополнительные AI-функции
+    # Доп. функции
     summary = summarize_post(post)
     translation = translate_post(post, "en")
     prediction = predict_market_sentiment(post)
     catchy_title = generate_catchy_title(post)
 
-    # Полный AI-ответ
-    full_comment = f"""💡 *AI-резюме*: {summary}
-🌐 *Перевод*: {translation}
-📊 *Прогноз*: {prediction}
-🧠 *Заголовок*: {catchy_title}
-
-✍️ *Комментарий бота*: {comment}
-"""
+    full_comment = (
+        f"💡 *AI-резюме*: {summary}\n"
+        f"🌐 *Перевод*: {translation}\n"
+        f"📊 *Прогноз*: {prediction}\n"
+        f"🧠 *Заголовок*: {catchy_title}\n\n"
+        f"✍️ *Комментарий бота*: {comment}"
+    )
 
     try:
-        # Отправка сгенерированного сообщения
         await client.send_message(
             entity=event.chat_id,
             message=full_comment,
             reply_to=event.message.id,
             parse_mode="markdown"
         )
+        print("Комментарий отправлен")
     except Exception as e:
-        print(f"Ошибка при отправке сообщения: {e}")
+        print(f"Ошибка при отправке комментария: {e}")
 
-    # Реакция на пост с вероятностью 50%
+    # Случайная реакция
     if random.random() < 0.5:
         try:
             await client(functions.messages.SendReactionRequest(
@@ -111,13 +105,11 @@ async def handle_new_post(event):
                 msg_id=event.message.id,
                 reaction=[types.ReactionEmoji(emoticon=random.choice(reaction_emojis))]
             ))
+            print("Реакция отправлена")
         except Exception as e:
             print(f"Ошибка при отправке реакции: {e}")
 
-    # Обновление обратной связи
     update_feedback(db, comment)
 
-# Запуск клиента
-with client:
-    print("SmartProfitBot запущен...")
-    client.run_until_disconnected()
+print("SmartProfitBot запущен...")
+client.run_until_disconnected()
