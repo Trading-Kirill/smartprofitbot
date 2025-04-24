@@ -1,13 +1,19 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 from tinydb import TinyDB, Query
 
-# Загружаем .env для того, чтобы os.getenv("OPENAI_API_KEY") уже видел ключ
-load_dotenv()
+# Явно указываем путь к .env рядом с этим файлом
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # Инициализация клиента OpenAI с ключом из переменных окружения
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    raise EnvironmentError("OPENAI_API_KEY не задана в .env")
+
+client = OpenAI(api_key=api_key)
 
 def generate_ai_comment(post_text: str, ticker_info: str, style: str) -> str:
     prompt = (
