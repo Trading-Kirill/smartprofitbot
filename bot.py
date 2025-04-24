@@ -117,8 +117,6 @@ async def handle_new_post(event):
     # Обновление обратной связи
     update_feedback(db, comment)
 
-print(f"Получено сообщение: {event.message.message}")
-
 # Запуск клиента
 with client:
     print("SmartProfitBot запущен...")
